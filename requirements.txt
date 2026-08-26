@@ -2,4 +2,4 @@ numpy
 scipy
 matplotlib
 pytest
-cupy-cuda13x
+cupy-cuda12x #as I am using CUDA 12.X

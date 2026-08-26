@@ -8,7 +8,8 @@ from .pilot import generate_pilot_reference
 from .detector import (adaptive_threshold, correlate_single_frequency, find_bursts_2d,
                        generate_frequency_grid, generate_frequency_shifted_references,
                        strongest_detection)
-from .correlation.cpu import CPUCorrelationBackend
+from .correlation.cpu import CPUCorrelationBackend # to support CPU execution
+from .correlation.cuda import CUDACorrelationBackend # to support cuda-config
 from .plots import (get_pyplot, plot_reference_waveform, plot_time_frequency_correlation,
                     compute_local_correlation_surface, plot_local_correlation_surface)
 
@@ -27,6 +28,13 @@ def build_parser():
         "Frequency spacing for future fine-frequency refinement "
         "around detected peaks."
     ),)
+    p.add_argument("--backend",choices=["cpu", "cuda"],default="cpu",
+    help=(
+        "Correlation backend. "
+        "Use 'cpu' for SciPy or 'cuda' for CuPy/GPU. "
+        "Default: cpu."
+    ),)
+
     return p
 
 def self_test():
@@ -45,7 +53,8 @@ def run_frequency_search(args,received):
 
     freqs,refs=generate_frequency_shifted_references(args.pilot,args.sample_rate,freqs,args.oversampling)
     # FINAL CUDA MILESTONE: replace this backend selection only.
-    backend=CPUCorrelationBackend()
+    backend = create_correlation_backend(
+    args.backend)
     surface=backend.correlate(received,refs)
     threshold=args.threshold if args.threshold is not None else adaptive_threshold(surface)
     detections=find_bursts_2d(freqs,surface,threshold,pilot_bits=args.pilot,oversampling=args.oversampling)
@@ -82,6 +91,36 @@ def run_single_frequency(args,received):
         if args.save_plots:
             out=Path(args.save_plots); out.mkdir(parents=True,exist_ok=True); fig.savefig(out/"01_reference_waveform.png",dpi=150,bbox_inches="tight")
         if args.plot: plt.show()
+
+def create_correlation_backend(
+    backend_name,
+):
+    """
+    Create the requested correlation backend.
+
+    Supported:
+        cpu
+        cuda
+    """
+
+    backend_name = backend_name.lower()
+
+    if backend_name == "cpu":
+        print(
+            "Using CPU correlation backend."
+        )
+        return CPUCorrelationBackend()
+
+    if backend_name == "cuda":
+        print(
+            "Using CUDA correlation backend."
+        )
+        return CUDACorrelationBackend()
+
+    raise ValueError(
+        f"Unknown backend: {backend_name}. "
+        f"Choose 'cpu' or 'cuda'."
+    )
 
 def main(argv=None):
     args=build_parser().parse_args(argv)
