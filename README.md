@@ -30,7 +30,9 @@ python main.py
 ```
 
 ```bash
-python main.py Path_of_the_test_Data --freq-search --sample-rate 228515.616 --plot --backend cpu/cuda
+python main.py Path_of_the_test_Data --freq-search --oversampling 96 --sample-rate 228515.616 --plot --backend cpu/cuda
+
+python main.py Path_of_the_test_Data --freq-search --oversampling 1024 --sample-rate 2437499.904 --plot --backend cpu/cuda
 ```
 
 The final CUDA milestone should replace `CPUCorrelationBackend` with

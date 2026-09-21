@@ -2,7 +2,9 @@
 import argparse
 from pathlib import Path
 import numpy as np
+import time
 from .config import *
+from .config import PILOT_BITS, OVERSAMPLING
 from .io import load_iq_file
 from .pilot import generate_pilot_reference
 from .detector import (adaptive_threshold, correlate_single_frequency, find_bursts_2d,
@@ -37,8 +39,11 @@ def build_parser():
 
     return p
 
+# Will not be executed if the IQ file paths are provided
 def self_test():
-    ref=generate_pilot_reference(); rng=np.random.default_rng(0); offset=1234
+    ref=generate_pilot_reference()
+    rng=np.random.default_rng(0)
+    offset=1234
     received=((rng.normal(size=5000)+1j*rng.normal(size=5000))*0.05).astype(np.complex64)
     received[offset:offset+len(ref)]+=ref
     corr=correlate_single_frequency(received,ref); detected=int(np.argmax(corr))
@@ -52,7 +57,6 @@ def run_frequency_search(args,received):
     channel_spacing_hz=CHANNEL_SPACING_HZ,)
 
     freqs,refs=generate_frequency_shifted_references(args.pilot,args.sample_rate,freqs,args.oversampling)
-    # FINAL CUDA MILESTONE: replace this backend selection only.
     backend = create_correlation_backend(
     args.backend)
     surface=backend.correlate(received,refs)
@@ -73,24 +77,35 @@ def run_frequency_search(args,received):
             local=plot_local_correlation_surface(tau,df,db,plt,args.plot)
             print(f"Strongest local maximum: sample={ps}, frequency={pf:+.2f} Hz, magnitude={pm:.4f}")
         if args.save_plots:
-            out=Path(args.save_plots); out.mkdir(parents=True,exist_ok=True)
+            out=Path(args.save_plots)
+            out.mkdir(parents=True,exist_ok=True)
             fig.savefig(out/"04_time_frequency_correlation.png",dpi=150,bbox_inches="tight")
-            if local: local.savefig(out/"05_local_global_max_correlation.png",dpi=150,bbox_inches="tight")
-        if args.plot: plt.show()
+            if local: 
+                local.savefig(out/"05_local_global_max_correlation.png",dpi=150,bbox_inches="tight")
+        if args.plot: 
+            plt.show()
 
 def run_single_frequency(args,received):
     from scipy.signal import find_peaks
-    ref=generate_pilot_reference(args.pilot,args.oversampling); corr=correlate_single_frequency(received,ref)
-    median=np.median(corr); mad=np.median(np.abs(corr-median)); threshold=args.threshold if args.threshold is not None else median+8*1.4826*mad
-    idx,_=find_peaks(corr,height=threshold,distance=len(ref)); print(f"Threshold: {threshold:.4f}\nDetected {len(idx)} burst(s).")
+    ref=generate_pilot_reference(args.pilot,args.oversampling)
+    corr=correlate_single_frequency(received,ref)
+    median=np.median(corr)
+    mad=np.median(np.abs(corr-median))
+    threshold=args.threshold if args.threshold is not None else median+8*1.4826*mad
+    idx,_=find_peaks(corr,height=threshold,distance=len(ref))
+    print(f"Threshold: {threshold:.4f}\nDetected {len(idx)} burst(s).")
     if args.plot or args.save_plots:
-        plt=get_pyplot(args.plot); fig=plot_reference_waveform(ref,args.pilot,args.oversampling,plt,args.plot)
+        plt=get_pyplot(args.plot)
+        fig=plot_reference_waveform(ref,args.pilot,args.oversampling,plt,args.plot)
         from types import SimpleNamespace
         detections=[SimpleNamespace(sample_index=int(i),frequency_hz=0.0,magnitude=float(corr[i])) for i in idx]
         # Keep single-frequency plotting intentionally simple.
         if args.save_plots:
-            out=Path(args.save_plots); out.mkdir(parents=True,exist_ok=True); fig.savefig(out/"01_reference_waveform.png",dpi=150,bbox_inches="tight")
-        if args.plot: plt.show()
+            out=Path(args.save_plots)
+            out.mkdir(parents=True,exist_ok=True)
+            fig.savefig(out/"01_reference_waveform.png",dpi=150,bbox_inches="tight")
+        if args.plot: 
+            plt.show()
 
 def create_correlation_backend(
     backend_name,
@@ -124,6 +139,14 @@ def create_correlation_backend(
 
 def main(argv=None):
     args=build_parser().parse_args(argv)
-    if args.iq_path is None: return self_test()
-    received=load_iq_file(args.iq_path); print(f"Loaded '{args.iq_path}': {len(received)} IQ samples")
+    args_dict=args.__dict__
+    if args.iq_path is None:
+        return self_test()
+    received=load_iq_file(args.iq_path)
+    print(f"Loaded '{args.iq_path}': {len(received)} IQ samples")
+    start = time.time() # benchmarking time
     run_frequency_search(args,received) if args.freq_search else run_single_frequency(args,received)
+    end = time.time() # benchmarking time
+    print(f"Total time elapsed on {args_dict['backend']} is {(end-start):.3f}\n")
+
+

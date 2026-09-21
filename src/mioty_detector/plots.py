@@ -50,7 +50,8 @@ def compute_local_correlation_surface(received_iq, reference_iq, sample_rate, ce
                                        frequency_half_width_hz=1000, frequency_step_hz=25):
     """Compute C(tau,f) around the strongest burst and normalize max to 0 dB."""
     from scipy.signal import correlate
-    half=int(round(time_half_width_ms*sample_rate/1000)); start=max(0,int(center_sample)-half)
+    half=int(round(time_half_width_ms*sample_rate/1000))
+    start=max(0,int(center_sample)-half)
     end=min(len(received_iq),int(center_sample)+half+len(reference_iq)); segment=received_iq[start:end]
     freqs=np.arange(center_frequency_hz-frequency_half_width_hz, center_frequency_hz+frequency_half_width_hz+frequency_step_hz/2, frequency_step_hz)
     t=np.arange(len(reference_iq))/sample_rate; energy=np.sum(np.abs(reference_iq)**2)
@@ -60,19 +61,39 @@ def compute_local_correlation_surface(received_iq, reference_iq, sample_rate, ce
         c=correlate(segment,shifted,mode="valid",method="fft")
         surface[row]=np.abs(c)/np.sqrt(energy)
     r,c=np.unravel_index(np.argmax(surface),surface.shape); maximum=surface[r,c]
-    peak_f=freqs[r]; peak_sample=start+c
+    peak_f=freqs[r]
+    peak_sample=start+c
     tau=(np.arange(surface.shape[1])-c)/sample_rate*1000
     df=freqs-peak_f
     db=np.maximum(20*np.log10(np.maximum(surface/maximum,1e-12)),-21)
     return tau,df,db,peak_sample,peak_f,maximum
 
-def plot_local_correlation_surface(time_offsets_ms, frequency_offsets_hz, surface_db, plt=None, interactive=True):
+
+def plot_local_correlation_surface(time_offsets_ms,
+                                   frequency_offsets_hz,
+                                   surface_db,
+                                   plt=None,
+                                   interactive=True):
     """Reference-style local correlation lobe centered at (0 ms, 0 Hz)."""
-    if plt is None: plt=get_pyplot(interactive)
-    levels=np.arange(-21,0.1,3)
-    fig,ax=plt.subplots(figsize=(10,7))
-    cf=ax.contourf(time_offsets_ms,frequency_offsets_hz/1000,surface_db,levels=levels,cmap="viridis",extend="min")
-    fig.colorbar(cf,ax=ax,ticks=[-21,-18,-15,-12,-9,-6,-3,0],label="Normalized correlation [dB]")
-    ax.scatter(0,0,s=35,c="black",zorder=10); ax.axvline(0,linewidth=.8,alpha=.5); ax.axhline(0,linewidth=.8,alpha=.5)
-    ax.set_xlabel("Time offset [ms]"); ax.set_ylabel("Frequency offset [kHz]"); ax.set_title("Local 2-D pilot correlation around strongest burst"); ax.grid(alpha=.2)
-    fig.tight_layout(); return fig
+    if plt is None: plt = get_pyplot(interactive)
+    levels = np.arange(-21, 0.1, 3)
+    fig, ax = plt.subplots(figsize=(10, 7))
+    cf = ax.contourf(time_offsets_ms,
+                     frequency_offsets_hz / 1000,
+                     surface_db,
+                     levels=levels,
+                     cmap="viridis",
+                     extend="min")
+    fig.colorbar(cf,
+                 ax=ax,
+                 ticks=[-21, -18, -15, -12, -9, -6, -3, 0],
+                 label="Normalized correlation [dB]")
+    ax.scatter(0, 0, s=35, c="black", zorder=10)
+    ax.axvline(0, linewidth=.8, alpha=.5)
+    ax.axhline(0, linewidth=.8, alpha=.5)
+    ax.set_xlabel("Time offset [ms]")
+    ax.set_ylabel("Frequency offset [kHz]")
+    ax.set_title("Local 2-D pilot correlation around strongest burst")
+    ax.grid(alpha=.5)
+    fig.tight_layout()
+    return fig

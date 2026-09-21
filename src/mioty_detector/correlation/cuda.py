@@ -309,7 +309,7 @@ class CUDACorrelationBackend:
         )
 
         # ------------------------------------------------------------
-        # 10. Transfer ONLY the final result back to CPU.
+        # 10. Transferring ONLY the final result back to CPU.
         #
         # The FFTs and correlation stay on the GPU.
         # ------------------------------------------------------------
@@ -322,20 +322,3 @@ class CUDACorrelationBackend:
             np.float32,
             copy=False,
         )
-
-    def synchronize(self):
-        """
-        Wait until all queued CUDA work has completed.
-
-        Useful for benchmarking.
-        """
-
-        self.cp.cuda.Stream.null.synchronize()
-
-    def device_info(self):
-        """Return basic information about the selected GPU."""
-
-        return {
-            "name": self.device.name,
-            "device_id": self.device.id,
-        }
